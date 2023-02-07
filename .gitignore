@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+code/4-20mA/MDK-ARM/4-20mA
+code/bootloader/STM32G0Bootloader/STM32G0Bootloader/MDK-ARM/STM32G0Bootloader
