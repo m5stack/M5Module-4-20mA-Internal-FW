@@ -40,9 +40,9 @@ void i2c1_it_enable(void)
   LL_I2C_EnableIT_ADDR(I2C1);
 	// LL_I2C_EnableIT_TX(I2C1);
 	// LL_I2C_EnableIT_RX(I2C1);  
-  // LL_I2C_EnableIT_NACK(I2C1);
-  // LL_I2C_EnableIT_ERR(I2C1);
-  // LL_I2C_EnableIT_STOP(I2C1);
+  LL_I2C_EnableIT_NACK(I2C1);
+  LL_I2C_EnableIT_ERR(I2C1);
+  LL_I2C_EnableIT_STOP(I2C1);
 }
 
 void i2c1_it_disable(void)
@@ -50,9 +50,9 @@ void i2c1_it_disable(void)
   LL_I2C_DisableIT_ADDR(I2C1);
 	// LL_I2C_DisableIT_TX(I2C1);
 	// LL_I2C_DisableIT_RX(I2C1);
-  // LL_I2C_DisableIT_NACK(I2C1);
-  // LL_I2C_DisableIT_ERR(I2C1);
-  // LL_I2C_DisableIT_STOP(I2C1);
+  LL_I2C_DisableIT_NACK(I2C1);
+  LL_I2C_DisableIT_ERR(I2C1);
+  LL_I2C_DisableIT_STOP(I2C1);
 }
 
 void Error_Callback(void)

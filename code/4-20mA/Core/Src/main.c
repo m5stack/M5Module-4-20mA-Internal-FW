@@ -328,20 +328,21 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
     cal_index[1] = 0;
     usVoltageValue[1] = ((float)usAdcValue16[1]) / 65535.0 * 3.3;
     usCalValue[1] = usVoltageValue[1] / ref_current_float[1];    
+    cal_store_ch2.f = usCalValue[1];
     cal_data_write_back();
   }
   if (cal_index[2]) {
     cal_index[2] = 0;
     usVoltageValue[2] = ((float)usAdcValue16[2]) / 65535.0 * 3.3;
     usCalValue[2] = usVoltageValue[2] / ref_current_float[2];  
-    cal_store_ch2.f = usCalValue[2];  
+    cal_store_ch3.f = usCalValue[2];  
     cal_data_write_back();
   }
   if (cal_index[3]) {
     cal_index[3] = 0;
     usVoltageValue[3] = ((float)usAdcValue16[3]) / 65535.0 * 3.3;
     usCalValue[3] = usVoltageValue[3] / ref_current_float[3];  
-    cal_store_ch3.f = usCalValue[3];  
+    cal_store_ch4.f = usCalValue[3];  
     cal_data_write_back();
   }
 
