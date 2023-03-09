@@ -221,6 +221,8 @@ void Reset_AllPeriph(void)
   LL_I2C_DisableIT_ADDR(I2C1);
   SysTick->CTRL=0;
   SYSCFG->CFGR1 &= SYSCFG_CFGR1_MEM_MODE;
+  NVIC->ICER[0] = 0xFFFFFFFF;
+  NVIC->ICPR[0] = 0xFFFFFFFF;
   /* Set EXTICRx registers to reset value */
   EXTI->EXTICR[0] = 0;
   EXTI->EXTICR[1] = 0;
@@ -269,7 +271,14 @@ void Write_Code(void)
     
     if(Number_Bytes_Transferred > 0)
     {
-      HAL_FLASH_Unlock();
+      if(__HAL_FLASH_GET_FLAG(FLASH_FLAG_CFGBSY) != 0x00U) {
+        *(uint32_t *)(Add_Flash + 600) = 12323;
+        FLASH->SR = FLASH_SR_CLEAR;
+      }
+step_unlock:
+      if(HAL_FLASH_Unlock() != HAL_OK) {
+        goto step_unlock;
+      }
 
       PageNum = GetPage(Add_Flash);
 
@@ -278,6 +287,7 @@ void Write_Code(void)
       My_Flash.NbPages = 1;                        //说明要擦除的页数，此参数必须是Min_Data = 1和Max_Data =(�???大页�???-初始页的�???)之间的�??              
 
 step_erase:      
+      FLASH_WaitForLastOperation(50);
       if (HAL_FLASHEx_Erase(&My_Flash, &PageError) != HAL_OK) {
         goto step_erase;
       }  //调用擦除函数擦除  
@@ -288,11 +298,12 @@ step_erase:
         | ((uint64_t)Receive_Buffer[Data_index+4] << 32) | ((uint64_t)Receive_Buffer[Data_index+5] << 40) \
         | ((uint64_t)Receive_Buffer[Data_index+6] << 48) | ((uint64_t)Receive_Buffer[Data_index+7] << 56);	
 
-step_write:        		
-        while (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Add_Flash, Data) != HAL_OK)
+step_write:       
+        FLASH_WaitForLastOperation(50);
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Add_Flash, Data) != HAL_OK)
         {
           goto step_write;
-        }
+        }			
         Add_Flash = Add_Flash + 8;
         Data_index = Data_index + 8;        
         // else
@@ -303,12 +314,13 @@ step_write:
         //   {
         //   }
         // }
-      }            
+      }
+      HAL_FLASH_Lock();            
     }
     for (int i = 0; i < sizeof(Receive_Buffer); i++) {
       Receive_Buffer[i] = 0;
     }
-    HAL_FLASH_Lock();
+    
 }
 
 void iap_i2c(void)
@@ -334,6 +346,7 @@ void iap_i2c(void)
           
           case OPC_USRCD:
             Jump_APP();
+            // HAL_NVIC_SystemReset();
             break;
           
           default:                  
