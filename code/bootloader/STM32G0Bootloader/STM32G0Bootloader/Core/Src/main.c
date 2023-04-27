@@ -315,7 +315,8 @@ step_write:
         //   }
         // }
       }
-      HAL_FLASH_Lock();            
+      HAL_FLASH_Lock();  
+      FLASH_WaitForLastOperation(50);          
     }
     for (int i = 0; i < sizeof(Receive_Buffer); i++) {
       Receive_Buffer[i] = 0;
