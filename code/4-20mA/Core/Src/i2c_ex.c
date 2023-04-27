@@ -1,199 +1,93 @@
 /* Includes ------------------------------------------------------------------*/
 #include "i2c_ex.h"
-#include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
-#define UNUSED(X) (void)X      /* To avoid gcc/g++ warnings */
-
+#define I2C_WRITE_OPERATION		0
+#define I2C_READ_OPERATION		1
 #define	I2C_RECEIVE_BUFFER_LEN	50
 
-__IO uint8_t aReceiveBuffer[I2C_RECEIVE_BUFFER_LEN];
+__IO uint8_t rx_buffer[I2C_RECEIVE_BUFFER_LEN];
 __IO uint8_t tx_buffer[I2C_RECEIVE_BUFFER_LEN];
-__IO uint16_t ubReceiveIndex = 0;
-uint8_t* pSlaveTransmitBuffer = 0;
-volatile uint8_t i2c_addr = 0;
-volatile uint8_t tx_buffer_index = 0;
-volatile uint8_t tx_len = 0;
+__IO uint16_t tx_len = 0;
+__IO uint8_t tx_state = 0;
 
-void set_i2c_slave_address(uint8_t addr)
-{
-  i2c_addr = (addr << 1);
-}
 
-__weak void Slave_Complete_Callback(uint8_t *rx_data, uint16_t len)
-{
+__weak void i2c1_receive_callback(uint8_t *rx_data, uint16_t len) {
 	/* Prevent unused argument(s) compilation warning */
 	UNUSED(rx_data);
-	UNUSED(len);  
+	UNUSED(len);
+
+	/* NOTE : This function should not be modified, when the callback is needed,
+			  the i2c1_receive_callback could be implemented in the user file
+	 */
 }
 
-void i2c1_it_enable(void)
-{
-  LL_I2C_Enable(I2C1);
-
-  /* (6) Enable I2C1 address match/error interrupts:
-   *  - Enable Address Match Interrupt
-   *  - Enable Not acknowledge received interrupt
-   *  - Enable Error interrupts
-   *  - Enable Stop interrupt
-   */
-  LL_I2C_EnableIT_ADDR(I2C1);
-	// LL_I2C_EnableIT_TX(I2C1);
-	// LL_I2C_EnableIT_RX(I2C1);  
-  LL_I2C_EnableIT_NACK(I2C1);
-  LL_I2C_EnableIT_ERR(I2C1);
-  LL_I2C_EnableIT_STOP(I2C1);
-}
-
-void i2c1_it_disable(void)
-{
-  LL_I2C_DisableIT_ADDR(I2C1);
-	// LL_I2C_DisableIT_TX(I2C1);
-	// LL_I2C_DisableIT_RX(I2C1);
-  LL_I2C_DisableIT_NACK(I2C1);
-  LL_I2C_DisableIT_ERR(I2C1);
-  LL_I2C_DisableIT_STOP(I2C1);
-}
-
-void Error_Callback(void)
-{
-	i2c1_it_enable();
-	LL_I2C_AcknowledgeNextData(I2C1, LL_I2C_NACK);
+__weak void i2c1_addr_req_callback(uint8_t TransferDirection) {
+  UNUSED(TransferDirection);
 }
 
 void i2c1_set_send_data(uint8_t *tx_ptr, uint16_t len) {
   if (len > I2C_RECEIVE_BUFFER_LEN) {
     len = I2C_RECEIVE_BUFFER_LEN;
 	}
+	tx_len = len;
 
   if (len == 0 || tx_ptr == NULL) {
     return;
   }
   memcpy((void *)tx_buffer, tx_ptr, len);
-  tx_buffer_index = 0;
-  tx_len = len;
 }
 
-void Slave_Reception_Callback(void)
-{
-  /* Read character in Receive Data register.
-  RXNE flag is cleared by reading data in RXDR register */
-  aReceiveBuffer[ubReceiveIndex++] = LL_I2C_ReceiveData8(I2C1);
+void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
+	if (hi2c->Instance == hi2c1.Instance) {
+		hi2c->State = HAL_I2C_STATE_READY;
+		i2c1_addr_req_callback(TransferDirection);
+		if (TransferDirection == I2C_WRITE_OPERATION) {
+			HAL_I2C_Slave_Receive_IT(hi2c, (uint8_t *)rx_buffer, I2C_RECEIVE_BUFFER_LEN);
+		}
+		else {
+			HAL_I2C_Slave_Transmit_IT(hi2c, (uint8_t *)tx_buffer, tx_len);
+      tx_state = 1;
+		}
+    __HAL_I2C_CLEAR_FLAG(hi2c, I2C_FLAG_ADDR);
+		HAL_I2C_EnableListen_IT(&hi2c1);
+	}
 }
 
-void Slave_Ready_To_Transmit_Callback(void)
-{
-  /* Send the Byte requested by the Master */
-  LL_I2C_TransmitData8(I2C1, tx_buffer[tx_buffer_index]);
-  tx_buffer_index++;
-  if (tx_buffer_index >= tx_len) {
-    tx_buffer_index = 0;
-  }
-}
+// read finish will callback
+void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c) {
+	if (hi2c->Instance == hi2c1.Instance) {
 
-void I2C1_IRQHandler(void)
-{
-  /* USER CODE BEGIN I2C1_IRQn 0 */
-  /* Check ADDR flag value in ISR register */
-  if(LL_I2C_IsActiveFlag_ADDR(I2C1))
-  {
-    /* Verify the Address Match with the OWN Slave address */
-    if(LL_I2C_GetAddressMatchCode(I2C1) == i2c_addr)
-    {
-      if (ubReceiveIndex) {
-        i2c1_it_disable();
-        Slave_Complete_Callback((uint8_t *)aReceiveBuffer, ubReceiveIndex);
-        ubReceiveIndex = 0; 
-        i2c1_it_enable();       
-      }
-      /* Verify the transfer direction, a write direction, Slave enters receiver mode */
-      if(LL_I2C_GetTransferDirection(I2C1) == LL_I2C_DIRECTION_WRITE)
-      {
-        /* Clear ADDR flag value in ISR register */
-        LL_I2C_ClearFlag_ADDR(I2C1);
-
-        /* Enable Receive Interrupt */
-        LL_I2C_EnableIT_RX(I2C1);
-      }
-      /* Verify the transfer direction, a read direction, Slave enters transmitter mode */
-      else if(LL_I2C_GetTransferDirection(I2C1) == LL_I2C_DIRECTION_READ)
-      {
-        /* Clear ADDR flag value in ISR register */
-        LL_I2C_ClearFlag_ADDR(I2C1);
-
-        /* Enable Transmit Interrupt */
-        LL_I2C_EnableIT_TX(I2C1);
-      }      
-      else
-      {
-        /* Clear ADDR flag value in ISR register */
-        LL_I2C_ClearFlag_ADDR(I2C1);
-
-        /* Call Error function */
-        Error_Callback();
-      }
+    if (tx_state != 1) {
+      i2c1_receive_callback((uint8_t *)&rx_buffer[0], I2C_RECEIVE_BUFFER_LEN - hi2c->XferSize);
     }
-    else
-    {
-      /* Clear ADDR flag value in ISR register */
-      LL_I2C_ClearFlag_ADDR(I2C1);
-        
-      /* Call Error function */
-      Error_Callback();
-    }
-  }
-  /* Check NACK flag value in ISR register */
-  else if(LL_I2C_IsActiveFlag_NACK(I2C1))
-  {
-    /* End of Transfer */
-    LL_I2C_ClearFlag_NACK(I2C1);
-  } 
-  /* Check TXIS flag value in ISR register */
-  else if(LL_I2C_IsActiveFlag_TXIS(I2C1))
-  {
-    /* Call function Slave Ready to Transmit Callback */
-    Slave_Ready_To_Transmit_Callback();
-  }   
-  /* Check RXNE flag value in ISR register */
-  else if(LL_I2C_IsActiveFlag_RXNE(I2C1))
-  {
-    /* Call function Slave Reception Callback */
-    Slave_Reception_Callback();
-  }
-  /* Check STOP flag value in ISR register */
-  else if(LL_I2C_IsActiveFlag_STOP(I2C1))
-  {
-    /* End of Transfer */
-    LL_I2C_ClearFlag_STOP(I2C1);
-
-    /* Check TXE flag value in ISR register */
-    if(!LL_I2C_IsActiveFlag_TXE(I2C1))
-    {
-      /* Flush the TXDR register */
-      LL_I2C_ClearFlag_TXE(I2C1);
-    }    
-    
-    i2c1_it_disable();
-    /* Call function Slave Complete Callback */
-    Slave_Complete_Callback((uint8_t *)aReceiveBuffer, ubReceiveIndex);
-    ubReceiveIndex = 0;
-    i2c1_it_enable();
-  }
-  /* Check TXE flag value in ISR register */
-  else if(!LL_I2C_IsActiveFlag_TXE(I2C1))
-  {
-    /* Do nothing */
-    /* This Flag will be set by hardware when the TXDR register is empty */
-    /* If needed, use LL_I2C_ClearFlag_TXE() interface to flush the TXDR register  */
-  }  
-  else
-  {
-    /* Call Error function */
-    Error_Callback();
-  }
-  /* USER CODE END I2C1_IRQn 0 */
-
-  /* USER CODE BEGIN I2C1_IRQn 1 */
-
-  /* USER CODE END I2C1_IRQn 1 */
+    tx_state = 0;
+		HAL_I2C_EnableListen_IT(&hi2c1);
+	}
 }
+
+// write finish will callback
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	if (hi2c->Instance == hi2c1.Instance) {
+		i2c1_receive_callback((uint8_t *)&rx_buffer[0], I2C_RECEIVE_BUFFER_LEN);
+		HAL_I2C_EnableListen_IT(&hi2c1);
+	}
+}
+
+// write finish will callback
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	if (hi2c->Instance == hi2c1.Instance) {
+    tx_state = 0;
+		HAL_I2C_EnableListen_IT(&hi2c1);
+	}
+}
+
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+
+  if (hi2c->Instance == hi2c1.Instance) {
+		HAL_I2C_EnableListen_IT(&hi2c1);
+		__HAL_I2C_GENERATE_NACK(&hi2c1);
+	}
+}
+

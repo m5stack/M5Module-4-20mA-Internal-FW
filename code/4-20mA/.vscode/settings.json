@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "stm32g0xx_hal_flash_ex.h": "c",
-        "stm32g0xx.h": "c"
+        "stm32g0xx.h": "c",
+        "main.h": "c"
     }
 }

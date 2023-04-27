@@ -5767,6 +5767,23 @@ static void I2C_ITAddrCplt(I2C_HandleTypeDef *hi2c, uint32_t ITFlags)
 #endif /* USE_HAL_I2C_REGISTER_CALLBACKS */
     }
   }
+  else if (hi2c->State == HAL_I2C_STATE_BUSY_RX) 
+  {
+    transferdirection = I2C_GET_DIR(hi2c);
+    slaveaddrcode = I2C_GET_ADDR_MATCH(hi2c);
+
+    I2C_Disable_IRQ(hi2c, I2C_XFER_LISTEN_IT | I2C_XFER_RX_IT | I2C_XFER_TX_IT);
+
+    /* Clear NACK Flag */
+    __HAL_I2C_CLEAR_FLAG(hi2c, I2C_FLAG_AF);
+
+    /* Process Unlocked */
+    __HAL_UNLOCK(hi2c);
+
+    /* Call the Listen Complete callback, to inform upper layer of the end of Listen usecase */
+    HAL_I2C_ListenCpltCallback(hi2c);
+    HAL_I2C_AddrCallback(hi2c, transferdirection, slaveaddrcode);
+  }  
   /* Else clear address flag only */
   else
   {

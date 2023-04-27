@@ -26,10 +26,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-extern void i2c1_it_enable(void);
-extern void i2c1_it_disable(void);
-extern void i2c1_set_send_data(uint8_t *tx_ptr, uint16_t len);
-extern void set_i2c_slave_address(uint8_t addr);
+void i2c1_set_send_data(uint8_t *tx_ptr, uint16_t len);
+extern void I2CAddReg(uint8_t reg, uint8_t* buff, uint8_t len, uint8_t bit);
+//static void I2CRead(uint8_t reg);
+//static void I2CWrite(uint8_t reg, uint8_t* data, uint8_t len);
 #ifdef __cplusplus
 }
 #endif
